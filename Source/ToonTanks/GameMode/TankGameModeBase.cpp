@@ -6,6 +6,7 @@
 #include "ToonTanks/Pawns/PawnTurret.h"
 #include "Kismet/GameplayStatics.h"
 #include "ToonTanks/PlayerControllers/PlayerControllerBase.h"
+#include "ToonTanks/ToonTanksGameInstance.h"
 
 void ATankGameModeBase::BeginPlay() 
 {
@@ -20,12 +21,16 @@ void ATankGameModeBase::HandleGameStart()
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), APawnTurret::StaticClass(), TurretActors);
     NumberOfTurrets = TurretActors.Num();
 
+    GameInstance = Cast<UToonTanksGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
+    UE_LOG(LogTemp, Warning, TEXT("%d"), GameInstance->LevelArray.Num());
+
     PlayerTank = Cast<APawnTank>(UGameplayStatics::GetPlayerPawn(this, 0));
 
     PlayerControllerRef = Cast<APlayerControllerBase>(UGameplayStatics::GetPlayerController(this, 0));
 
     GameStart();
 
+    // Countdown timer before game starts
     if (PlayerControllerRef) {
         PlayerControllerRef->SetPlayerEnabledState(false);
         FTimerHandle PlayerEnableHandle;
@@ -43,7 +48,18 @@ void ATankGameModeBase::HandleGameOver(bool PlayerWon)
         PlayerControllerRef->SetPlayerEnabledState(false);
     }
     PlayerTank->SetActorTickEnabled(false);
-    GameOver(PlayerWon);
+    // Open next level if player won, else display game over screen
+    if (PlayerWon) {
+        GameInstance->CurrentLevel++;
+        if (GameInstance->CurrentLevel < GameInstance->LevelArray.Num()) {
+            UGameplayStatics::OpenLevel(GetWorld(), GameInstance->LevelArray[GameInstance->CurrentLevel]);
+        } else {
+            // Display "YOU WIN" if there are no more levels
+            GameOver(true);
+        }
+    } else {
+        GameOver(false);
+    }
 }
 
 void ATankGameModeBase::ActorDied(AActor* DeadActor) 
